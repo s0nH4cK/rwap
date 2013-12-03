@@ -129,7 +129,9 @@ function start_air_suite()
     if [ -z $name ]
     then
       term1=`echo $new_mac | cut -d':' -f5`
+      term1=${term1^^}
       term2=`echo $new_mac | cut -d':' -f6`
+      term2=${term2^^}
       name="WLAN_"$term1$term2
     fi
     options="-e $name"
