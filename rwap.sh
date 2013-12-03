@@ -100,7 +100,7 @@ function disable_network_services()
 function configure_wireless_interface()
 {
   echo '[+] Configuring wireless interface'
-  ifconfig wlan0 down &> /dev/null
+  ifconfig $iface down &> /dev/null
   new_mac=`echo $(macchanger -r wlan0 | grep New)  |  cut -d' ' -f3`
   echo "[++] New mac address is $new_mac"
   iw reg set BO &> /dev/null
@@ -192,9 +192,10 @@ function start_dhcp()
   echo '[+] Starting dhcp server'
   if [ -z $out ]
   then
-    xterm -fn 7x13 -geometry $shell_2 -hold -e "dhcpd -cf ./dhcpd.conf -f -d && /etc/init.d/isc-dhcp-server start" &
+    xterm -fn 7x13 -geometry $shell_2 -hold -e "dhcpd -cf ./dhcpd.conf -f -d; /etc/init.d/isc-dhcp-server start" &
   else
-    dhcpd -cf ./dhcpd.conf -f -d && /etc/init.d/isc-dhcp-server start &> /dev/null &
+    dhcpd -cf ./dhcpd.conf -f -d &
+    /etc/init.d/isc-dhcp-server start &> /dev/null &
   fi
 }
 
