@@ -1,0 +1,31 @@
+This is a simple bash script that sets up a rogue ap and sniffs traffic.
+There are two modes of operation, normal mode (default) and twin mode
+In normal mode, the rogue ap name is WLAN_XXXX, where X is an hex random,
+unless it is specified by -n | --name argument.
+In twin mode, the script will prompt for the target ap using airodump, 
+and it will clone it with the strongest signal as possible.
+In both modes, the script will can run in verbose mode (default) or in quiet mode,
+writing ettercap logs to a file.
+
+Requires ettercap, sslstrip, airodump-ng (only in twin mode), airmon-ng (both included in aircrack suite),
+macchanger and isc-dhcp-server.
+
+Usage is:
+    rwap.sh -i <wireless_interface> [OPTIONS]
+    -i | --interface <wireless_interface>		-- The interface of the wireless card to be used for mounting the rogue ap
+    OPTIONS:
+	-h | --help					-- Show this help
+	-m | --mode <mode>		-- Mode operation: "normal" (default) and "twin"
+	-n | --name <rogue ap name>	-- Name of the rogue ap
+	-o | --output <file>			-- Ettercap output file
+	
+Examples:
+
+Normal verbose mode: rwap.sh -i wlan0 -n free_wifi
+Normal quiet mode: rwap.sh -i wlan0 -m normal -o outputfile
+Twin verbose mode: rwap.sh -i wlan0 -m twin
+
+There are probably much better solutions. However, you are free to test this one,
+improve it, share it, or simply ignore it.
+
+Replies to @s0nH4cK, s0nh4ck@gmail.com or elblogdes0nh4ck.blogspot.com
