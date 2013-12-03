@@ -47,7 +47,6 @@ shell_1=''
 shell_2=''
 shell_3=''
 shell_4=''
-shell_5=''
 
 VERSION='0.0.1alpha'
 
