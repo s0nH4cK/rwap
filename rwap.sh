@@ -116,7 +116,7 @@ function start_air_suite()
   echo '[+] Starting monitor mode'
   airmon-ng start wlan0 &> /dev/null
   
-  if [[ "$mode" -eq "twin" ]]
+  if [[ "$mode" == "twin" ]]
   then
     echo '[+] Starting airodump to select target'
     airodump-ng mon0
