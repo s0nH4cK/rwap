@@ -2,8 +2,8 @@
 
 # This is a simple bash script that sets up a rogue ap and sniffs traffic.
 # There are two modes of operation, normal mode (default) and twin mode
-# In normal mode, the rogue ap name is WLAN_XXXX, where X is an hex random,
-# unless it is specified by -n | --name argument.
+# In normal mode, the rogue ap essid is WLAN_XXXX, where X is an hex random,
+# unless it is specified by -e | --essid argument.
 # In twin mode, the script will prompt for the target ap using airodump, 
 # and it will clone it with the strongest signal as possible.
 # In both modes, the script will can run in verbose mode (default) or in quiet mode,
@@ -13,18 +13,18 @@
 # macchanger and isc-dhcp-server.
 #
 # Usage is:
-#     rwap.sh -i <wireless_interface> -d <dhcpd.conf> [OPTIONS]
+#     rwap.sh -i <wireless_interface> [OPTIONS]
 #     -i | --interface <wireless_interface>	-- The interface of the wireless card to be used for mounting the rogue ap
-#     -d | --dhcpdconf <dhcpd.conf>	-- The dhcpd.conf configuration file
 #     OPTIONS:
-# 		-h | --help					-- Show this help
+# 		-d | --dhcpdconf <dhcpd.conf>	-- The dhcpd.conf configuration file
+# 		-e | --essid <rogue ap essid>	-- ESSID of the rogue ap
+# 		-h | --help			-- Show this help
 # 		-m | --mode <mode>		-- Mode operation: "normal" (default) and "twin"
-# 		-n | --name <rogue ap name>	-- Name of the rogue ap
-# 		-o | --output <file>			-- Ettercap output file
+# 		-o | --output <file>		-- Ettercap output file
 # 	
 # Examples:
 # 
-# Normal verbose mode: rwap.sh -i wlan0 -n free_wifi
+# Normal verbose mode: rwap.sh -i wlan0 -e free_wifi
 # Normal quiet mode: rwap.sh -i wlan0 -m normal -o outputfile
 # Twin verbose mode: rwap.sh -i wlan0 -m twin
 # 
@@ -39,9 +39,9 @@
 ####################
 
 mode=''		# Mode operation
-iface=''		# Wireless interface
+iface=''	# Wireless interface
 out=''		# Output file
-name=''		# Name of the rogue ap
+essid=''		# Name of the rogue ap
 dhcpdconf=''	# dhcpd.conf configuration file
 
 # Sizes for the different shells
@@ -145,21 +145,21 @@ function start_air_suite()
     echo '[++] Enter target BSSID: '
     read bssid
     echo '[++] Enter target ESSID: '
-    read name
-    options="-a $bssid -e $name"
+    read essid
+    options="-a $bssid -e $essid"
   else
-    if [ -z $name ]
+    if [ -z $essid ]
     then
       term1=`echo $new_mac | cut -d':' -f5`
       term1=${term1^^}
       term2=`echo $new_mac | cut -d':' -f6`
       term2=${term2^^}
-      name="WLAN_"$term1$term2
+      essid="WLAN_"$term1$term2
     fi
-    options="-e $name"
+    options="-e $essid"
   fi
   
-  echo "[+] Starting rogue ap with BSSID $name"
+  echo "[+] Starting rogue ap with ESSID $essid"
   exit1=""
   if [ -z $out ]
   then
@@ -307,11 +307,11 @@ function print_help()
 {
     echo 'Usage is rwap.sh -i <wireless_interface> [OPTIONS]'
     echo '-i | --interface <wireless_interface>		-- The interface of the wireless card to be used for mounting the rogue ap'
-    echo '-d | --dhcpdconf <dhcpd.conf>		-- The dhcpd.conf configuration file'
     echo 'OPTIONS:'
+    echo '	-d | --dhcpdconf <dhcpd.conf>		-- The dhcpd.conf configuration file'
+    echo '	-e | --essid <rogue ap essid>	-- ESSID of the rogue ap'
     echo '	-h | --help			-- Show this help'
     echo '	-m | --mode <mode>		-- Mode operation: "normal" (default) or "twin"'
-    echo '	-n | --name <rogue ap name>	-- Name of the rogue ap'
     echo '	-o | --output <file>		-- Ettercap output file'
 }
 
@@ -388,9 +388,9 @@ else
       mode=$1
       shift
       ;;
-    -n | --name)
+    -e | --essid)
       shift
-      name=$1
+      essid=$1
       shift
       ;;
     -o | --output)
