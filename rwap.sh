@@ -271,7 +271,7 @@ function start_sslstrip()
     xterm -fn 7x13 -geometry $shell_3 -hold -e "sslstrip -f -p -k 10000" &
     exit1=$?
   else
-    sslstrip -f -p -k 10000 -w sslstrip.log &> /dev/null &
+    sslstrip -f -p -k 10000 &> /dev/null &
     exit1=$?
   fi
   
