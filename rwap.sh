@@ -369,40 +369,14 @@ else
   while [ -n "$1" ]
   do
     case "$1" in
-    -d | --dhcpdconf)
-      shift
-      dhcpdconf=$1
-      shift
-      ;;
-    -h | --help)
-      print_help
-      exit 0
-      ;;
-    -i | --interface)
-      shift
-      iface=$1
-      shift
-      ;; 
-    -m | --mode)
-      shift
-      mode=$1
-      shift
-      ;;
-    -e | --essid)
-      shift
-      essid=$1
-      shift
-      ;;
-    -o | --output)
-      shift
-      out=$1
-      shift
-      ;;
-    *)
-      print_help
-      exit 0
-      ;;
-      esac
+    -d | --dhcpdconf) shift; dhcpdconf=$1; shift;;
+    -h | --help) print_help; exit 0;;
+    -i | --interface) shift; iface=$1; shift;; 
+    -m | --mode) shift; mode=$1; shift;;
+    -e | --essid) shift; essid=$1; shift;;
+    -o | --output) shift; out=$1; shift;;
+    *) print_help; exit 0;;
+    esac
   done
 fi
 
